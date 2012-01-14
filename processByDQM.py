@@ -159,12 +159,24 @@ for frameNo in range(5, bl.nFrames -5):
     for j in range(5):
         for k in range(5):
            ###Unfortunately going to have to go through several file formats to be able to compute normalized CC
-           imJ = simpleITK.load
-           numpyImJ = simpleITK.convert
+           imJ = reader.SetFileName(RESULT_DIR + 'blockMatch/frame_' + str(frameNo - 1 - j) + '_' str(frameNo) + '.mhd')
+           numpyImJ = sitk.GetArrayFromImage(frameJDispItk).T
 
-           imK = simpleITK.load
-           numpyImK = simpleITK.convert
+           imK = reader.SetFileName(RESULT_DIR + 'blockMatch/frame_' + str(frameNo) + '_' str(frameNo + k + 1) + '.mhd')
+           numpyImK = sitk.GetArrayFromImage(frameJDispItk).T
            
-           rhoS[j,k] = cv.normCrossCorrelation(numpyImJ, numpyImK )
+           template = cv.fromarray( numpy.float32(abs(numpyImJ)  ) )
+           image = cv.fromarray( numpy.float32( abs(numpyImK))  )
+           resultCv = cv.fromarray(numpy.float32( np.zeros( (1,1) ) ) )
+           cv.MatchTemplate(template, image, resultCv, cv.CV_TM_CCORR_NORMED )
+        
+           rhoS[j,k] = float(np.asarray(resultCv) )
     
+
+    DQMarray = rhoS*rhoRf
+
+    #Pick out combination with best DQM
+    preSkip, postSkip = DQMarray.argmax()
+
+    #Create composite strain image, normalizing to 1%
 
