@@ -19,7 +19,6 @@ if not os.path.isfile(sys.argv[1]):
 BASE_PATH, RFD_NAME = os.path.split(os.path.abspath(sys.argv[1]))
 print "\nProcessing file named: " + RFD_NAME + "\non path: " + BASE_PATH + "\n"
 RESULT_DIR = BASE_PATH +'/' + RFD_NAME[:-4] + 'Results'
-
 if os.path.isdir(RESULT_DIR):
     print "\nError, data set already processed."
     print "Directory: " + RESULT_DIR + " Exists."
@@ -27,7 +26,6 @@ if os.path.isdir(RESULT_DIR):
 
 os.makedirs(RESULT_DIR)
 os.makedirs(RESULT_DIR + '/blockMatch')
-
 
 #Perform block-matching
 from blockMatch import blockMatchClass
@@ -40,7 +38,6 @@ for frameNo in range(6):
         bl.CreateStrainImage(preFrame = frameNo, skipFrame = skipNo, itkFileName = RESULT_DIR + '/blockMatch/frame_' + str(frameNo) +'_'
         + str(frameNo + 1 + skipNo) )
 
-
 #After block-matching I compute the frame triplets with the optimum DQM
 import numpy
 from numpy import zeros
@@ -48,11 +45,8 @@ import SimpleITK as sitk
 import cv
 from scipy.interpolate import interp1d, RectBivariateSpline
 from interp2NoSplines import interp2
-
-from matplotlib import pyplot
-import pdb
-pdb.set_trace()
 DQM = zeros( bl.nFrames )
+framePairs = zeros( (bl.nFrames, 2) )
 
 #for frameNo in range(5, bl.nFrames -5):
 for frameNo in range(5, 6):
@@ -99,17 +93,17 @@ for frameNo in range(5, 6):
         postRf = bl.data.copy()
         
         locationY, locationX = numpy.mgrid[bl.startY:bl.stopY - bl.stepY,bl.startX:bl.stopX]  
-        motionCompRf = interp2( numpy.arange(postRf.shape[1]), numpy.arange(postRf.shape[0]), postRf, locationY + dpYUp, locationX + dpXUp)
+        motionCompRf = interp2( numpy.arange(postRf.shape[1]), numpy.arange(postRf.shape[0]), postRf, locationX + dpXUp, locationY + dpYUp)
 
         #Now compute the cross correlation between the pre frame and the motion compensated post frame
         import cv
-        template = cv.fromarray( numpy.float32(motionCompRF)  )
+        template = cv.fromarray( numpy.float32(motionCompRf)  )
         image = cv.fromarray( numpy.float32( preRf)   )
-        resultCv = cv.fromarray(numpy.float32( np.zeros( (1,1) ) ) )
+        resultCv = cv.fromarray(numpy.float32( numpy.zeros( (1,1) ) ) )
         cv.MatchTemplate(template, image, resultCv, cv.CV_TM_CCORR_NORMED )
         
-        resultNp = np.asarray(resultCv)
-        rhoRfJ[skip] =  float(resultNp)
+        resultNp = numpy.asarray(resultCv)
+        rhoRfJ[skip, 0] =  float(resultNp)
 
 
         ###################
@@ -127,8 +121,8 @@ for frameNo in range(5, 6):
         dpXUp = zeros( (bl.stopY - bl.stepY - bl.startY , bl.stopX - bl.startX) )
 
         #Upsample displacement to same spacing as RF.
-        paramRfYIndexes = arange(bl.startY, bl.stopY, bl.stepY )
-        paramRfYIndexesNew = arange(bl.startY, bl.stopY - bl.stepY )
+        paramRfYIndexes = numpy.arange(bl.startY, bl.stopY, bl.stepY )
+        paramRfYIndexesNew = numpy.arange(bl.startY, bl.stopY - bl.stepY )
 
         #dpY
         for x in range(bl.stopX - bl.startX):
@@ -147,101 +141,114 @@ for frameNo in range(5, 6):
         postRf = bl.data.copy()
         
         locationY, locationX = numpy.mgrid[bl.startY:bl.stopY - bl.stepY,bl.startX:bl.stopX]  
-        motionCompRf = interp2(numpy.arange(postRf.shape[1]), numpy.arange(postRf.shape[0]), postRf, locationY + dpYUp, locationX + dpXUp)
+        motionCompRf = interp2(numpy.arange(postRf.shape[1]), numpy.arange(postRf.shape[0]), postRf, locationX + dpXUp, locationY + dpYUp)
 
         #Now compute the cross correlation between the pre frame and the motion compensated post frame
-        template = cv.fromarray( numpy.float32(motionCompRF)  )
+        template = cv.fromarray( numpy.float32(motionCompRf)  )
         image = cv.fromarray( numpy.float32( preRf)   )
-        resultCv = cv.fromarray(numpy.float32( np.zeros( (1,1) ) ) )
+        resultCv = cv.fromarray(numpy.float32( numpy.zeros( (1,1) ) ) )
         cv.MatchTemplate(template, image, resultCv, cv.CV_TM_CCORR_NORMED )
         
-        resultNp = np.asarray(resultCv)
-        rhoRfK[skip] = float(resultNp) #Compute motion compensated correlation
+        resultNp = numpy.asarray(resultCv)
+        rhoRfK[0,skip] = float(resultNp) #Compute motion compensated correlation
     
-    rhoRf = rhoRfJ + rhoRfK
+    rhoRf = (rhoRfJ + rhoRfK)/2
     rhoS = zeros( (5,5) )
 
 
     for j in range(5):
         for k in range(5):
            ###Unfortunately going to have to go through several file formats to be able to compute normalized CC
-           imJ = reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - j) + '_' + str(frameNo) + '.mhd')
+           reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - j) + '_' + str(frameNo) + '.mhd')
+           imJ = reader.Execute()
            numpyImJ = sitk.GetArrayFromImage(imJ)
 
-           imK = reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + '_' + str(frameNo + k + 1) + '.mhd')
+           reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + '_' + str(frameNo + k + 1) + '.mhd')
+           imK = reader.Execute()
            numpyImK = sitk.GetArrayFromImage(imK)
            
            template = cv.fromarray( numpy.float32(abs(numpyImJ)  ) )
            image = cv.fromarray( numpy.float32( abs(numpyImK))  )
-           resultCv = cv.fromarray(numpy.float32( np.zeros( (1,1) ) ) )
+           resultCv = cv.fromarray(numpy.float32( numpy.zeros( (1,1) ) ) )
            cv.MatchTemplate(template, image, resultCv, cv.CV_TM_CCORR_NORMED )
         
-           rhoS[j,k] = float(np.asarray(resultCv) )
+           rhoS[j,k] = float(numpy.asarray(resultCv) )
     
-
     DQMarray = rhoS*rhoRf
     
     #Pick out combination with best DQM
-    preSkip, postSkip = DQMarray.argmax()
+    preSkip, postSkip = numpy.unravel_index(DQMarray.argmax(), DQMarray.shape)
+    framePairs[frameNo, 0] = preSkip
+    framePairs[frameNo, 1] = postSkip
     DQM[frameNo] = DQMarray.max()
 
     #Create composite strain image, normalizing to 1%
-    reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + '_' + str(frameNo + 1 + postSkip) + 'dispY.mhd')
+    reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + '_' + str(frameNo + 1 + postSkip) + '.mhd')
     strainPreItk = reader.Execute()
-    strainPre = abs(sitk.GetArrayFromImage(strainPreItk).T)
+    strainPre = abs(sitk.GetArrayFromImage(strainPreItk))
     strainPre *= .01*strainPre.mean()
 
-    reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - preSkip) + '_' + str(frameNo) + 'dispY.mhd')
+    reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - preSkip) + '_' + str(frameNo) + '.mhd')
     strainPostItk = reader.Execute()
-    strainPost = abs(sitk.GetArrayFromImage(strainPostItk).T)
+    strainPost = abs(sitk.GetArrayFromImage(strainPostItk))
     strainPost *= .01*strainPost.mean()
 
     strainComposite = (strainPre + strainPost)/2
 
     #Save composite strain as itk image
     itkIm = sitk.GetImageFromArray(strainComposite)
+    itkIm.SetOrigin(strainPreItk.GetOrigin())
+    itkIm.SetSpacing(strainPreItk.GetSpacing())
     writer = sitk.ImageFileWriter()
 
     writer.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + 'strainComposite.mhd' )
     writer.Execute(itkIm)
 
+#Save winning frame triplets and DQM in arrays in case I want to pick out particular frames later
+numpy.save(RESULT_DIR + '/framePairs' ,framePairs)
+numpy.save(RESULT_DIR + '/DQM' ,DQM)
 
-#Now create plots, showing B-mode image, strain with 1 skipped frame
+#Now create plots, showing B-mode image, strain with adjacent frame
 #composite strain, and DQM
 os.makedirs(RESULT_DIR + '/pngImages')
 
 from scipy.signal import hilbert
-for frameNo in range(5, bl.nFrames -5):
+reader = sitk.ImageFileReader()
+from matplotlib import pyplot
+
+#for frameNo in range(5, bl.nFrames -5):
+for frameNo in range(5, 6):
 
     bl.ReadFrame(frameNo)
     bMode = numpy.log10( abs( hilbert(bl.data, axis = 0)) )
+    bMode -= bMode.max()
    
     reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + 'strainComposite.mhd')
     strainCompItk = reader.Execute()
-    strainComp = sitk.GetArrayFromImage(strainCompItk).T
-    strainCompRGB = bl.CreateParametricImage(strainComp, strainCompItk.GetOrigin(), strainCompItk.GetSpacing(), frameNo
+    strainComp = sitk.GetArrayFromImage(strainCompItk)
+    strainCompRGB = bl.CreateParametricImage(strainComp, strainCompItk.GetOrigin(), strainCompItk.GetSpacing(), inPixels = False, frameNo
     = frameNo, colormap = 'gray', vmin = 0, vmax = .01 )
     
-
     reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) +'_'+ str(frameNo + 1 ) + '.mhd')
     strainItk = reader.Execute()
-    strain = abs(sitk.GetArrayFromImage(strainItk).T)
-    strainRGB = bl.CreateParametricImage(strain, strainItk.GetOrigin(), strainItk.GetSpacing(), frameNo
+    strain = abs(sitk.GetArrayFromImage(strainItk))
+    strainRGB = bl.CreateParametricImage(strain, strainItk.GetOrigin(), strainItk.GetSpacing(), inPixels = False, frameNo
     = frameNo, colormap = 'gray', vmin = 0, vmax = .01 )
 
-    fig = pyplot.Figure()
+    fig = pyplot.figure()
     
     plt = fig.add_subplot(2,2,1)
-    plt.imshow(bMode, extent = [0, bl.fovX, bl.fovY], cmap = 'gray' )
+    plt.imshow(bMode, extent = [0, bl.fovX, bl.fovY, 0], cmap = 'gray' , vmin = -3, vmax = 0)
     
     plt = fig.add_subplot(2,2,2)
-    plt.imshow(strainRGB, extent = [0, bl.fovX, bl.fovY], cmap = 'gray', vmin = 0, vmax = 0.01 )
+    plt.imshow(strainRGB, extent = [0, bl.fovX, bl.fovY, 0], cmap = 'gray', vmin = 0, vmax = 0.01 )
     
     plt = fig.add_subplot(2,2,3)
-    plt.imshow(strainCompRGB, extent = [0, bl.fovX, bl.fovY], cmap = 'gray', vmin = 0, vmax = 0.01 )
+    plt.imshow(strainCompRGB, extent = [0, bl.fovX, bl.fovY, 0], cmap = 'gray', vmin = 0, vmax = 0.01 )
     
     plt = fig.add_subplot(2,2,4)
+    DQM = numpy.arange(50)
     plt.plot( DQM, lw = 5)
-    plt.plot( frameNo, DQM[frameNo], 'r0', markersize = 13 )
+    plt.plot( frameNo, DQM[frameNo], 'ro', markersize = 13 )
 
-    pyplot.savefig(RESULT_DIR + '/pngImages/frame_' + str(frameNo).zfill(3) + '.png')
+    fig.savefig(RESULT_DIR + '/pngImages/frame_' + str(frameNo).zfill(3) + '.png')
