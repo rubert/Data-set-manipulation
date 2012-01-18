@@ -21,7 +21,7 @@ print "\nProcessing file named: " + RFD_NAME + "\non path: " + BASE_PATH + "\n"
 RESULT_DIR = BASE_PATH +'/' + RFD_NAME[:-4] + 'Results'
 if os.path.isdir(RESULT_DIR):
     print "\nError, data set already processed."
-    print "Directory: " + RESULT_DIR + " Exists."
+    print "Directory: " + RESULT_DIR + " Exists. \n"
     sys.exit()
 
 os.makedirs(RESULT_DIR)
@@ -31,8 +31,7 @@ os.makedirs(RESULT_DIR + '/blockMatch')
 from blockMatch import blockMatchClass
 bl = blockMatchClass(BASE_PATH +'/'+ RFD_NAME, 'rfd', selectRoi = True)
 
-#for frameNo in range(bl.nFrames):
-for frameNo in range(6):
+for frameNo in range(bl.nFrames):
     for skipNo in range(5):
 
         bl.CreateStrainImage(preFrame = frameNo, skipFrame = skipNo, itkFileName = RESULT_DIR + '/blockMatch/frame_' + str(frameNo) +'_'
@@ -48,8 +47,7 @@ from interp2NoSplines import interp2
 DQM = zeros( bl.nFrames )
 framePairs = zeros( (bl.nFrames, 2) )
 
-#for frameNo in range(5, bl.nFrames -5):
-for frameNo in range(5, 6):
+for frameNo in range(5, bl.nFrames -5):
 
     tmpDQM = zeros( (5,5) )
     
@@ -216,8 +214,7 @@ from scipy.signal import hilbert
 reader = sitk.ImageFileReader()
 from matplotlib import pyplot
 
-#for frameNo in range(5, bl.nFrames -5):
-for frameNo in range(5, 6):
+for frameNo in range(5, bl.nFrames -5):
 
     bl.ReadFrame(frameNo)
     bMode = numpy.log10( abs( hilbert(bl.data, axis = 0)) )
@@ -247,7 +244,6 @@ for frameNo in range(5, 6):
     plt.imshow(strainCompRGB, extent = [0, bl.fovX, bl.fovY, 0], cmap = 'gray', vmin = 0, vmax = 0.01 )
     
     plt = fig.add_subplot(2,2,4)
-    DQM = numpy.arange(50)
     plt.plot( DQM, lw = 5)
     plt.plot( frameNo, DQM[frameNo], 'ro', markersize = 13 )
 

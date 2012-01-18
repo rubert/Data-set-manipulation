@@ -22,9 +22,24 @@ RESULT_DIR = BASE_PATH +'/' + RFD_NAME[:-4] + 'Bmode'
 
 if os.path.isdir(RESULT_DIR):
     print "\nError, data set already processed."
-    print "Directory: " + RESULT_DIR + " Exists."
+    print "Directory: " + RESULT_DIR + " Exists. \n"
     sys.exit()
 
 os.makedirs(RESULT_DIR)
 os.makedirs(RESULT_DIR + '/images')
 
+from rfData import rfClass
+rf = rfClass(BASE_PATH + '/' + RFD_NAME, 'rfd')
+
+
+for frames in range(rf.nFrames):
+    rf.SaveBModeImage(RESULT_DIR + '/images/frame_' + str(frames).zfill(3), image = frames)
+
+#Create movies
+import readrfd
+header = readrfd.headerInfo(BASE_PATH + '/' + RFD_NAME)
+fps = int( header[3] )
+import os
+os.system('''mencoder "mf://''' + RESULT_DIR + '''/images/*.png" -mf type=png:fps=5 -ovc lavc -o '''+ RESULT_DIR + '/bMode_fps5.avi')
+os.system('''mencoder "mf://''' + RESULT_DIR + '''/images/*.png" -mf type=png:fps=''' + str(fps)+''' -ovc lavc -o '''+ RESULT_DIR + '/bMode_fpsActual'
++ str(fps) +'.avi' )
