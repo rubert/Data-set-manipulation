@@ -12,12 +12,20 @@ WINDOWX = 10. #mm
 WINDOWY = 8. #mm
 
 if len(sys.argv) < 2:
-    print '\nError, usage is: \n generalizedSpectrumLiverClassifierLinearArray.py DATA_DIR'
+    print '\nError, usage is: \n generalizedSpectrumLiverClassifierLinearArray.py DATA_DIR <TISSUE_TYPE_A> <TISSUE_TYPE_B>'
     sys.exit()
 
+if len(sys.argv) < 4:
+    tissueA = 'Tissue_A'
+    tissueB = 'Tissue_B'
+
+else:
+    tissueA = argv[2]
+    tissueB = argv[3]
+
 DATA_DIR = sys.argv[1]
-LIVER_DIR = DATA_DIR + '/liver'
-PHANTOM_DIR = DATA_DIR + '/phantom'
+TISSUE_A_DIR = DATA_DIR + '/' + tissueA
+TISSUE_B_DIR = DATA_DIR + '/' + tissueB
 ROI_DIR = DATA_DIR + '/roi'
 
 import os
@@ -27,7 +35,7 @@ if not os.path.isdir(DATA_DIR):
     sys.exit()
 
 RESULT_DIR = DATA_DIR + '/results'
-'''
+
 if os.path.isdir(RESULT_DIR):
     os.rmdir(RESULT_DIR)
 os.mkdir(RESULT_DIR)
@@ -35,13 +43,14 @@ os.mkdir(RESULT_DIR)
 if os.path.isdir(ROI_DIR):
     os.rmdir(ROI_DIR)
 os.mkdir(ROI_DIR)
-'''
+
+
 from rfData import rfClass
 
 ##Get an ROI from the first file in the directory so I know
 ##its size in pixels
 print '\n ROI selection to determine ROI size in pixels'
-tmpRf = rfClass(LIVER_DIR + '/' + os.listdir(LIVER_DIR)[0], 'rfd')
+tmpRf = rfClass(TISSUE_A_DIR + '/' + os.listdir(TISSUE_A_DIR)[0], 'rfd')
 tmpRf.SetRoiFixedSize(WINDOWX, WINDOWY)    
 region = tmpRf.data[tmpRf.roiY[0]:tmpRf.roiY[1], tmpRf.roiX[0]:tmpRf.roiX[1]]
 roiPoints, roiLines = region.shape
@@ -58,7 +67,8 @@ fracUnitCircle = (highCut - lowCut)/(tmpRf.fs/10**6)
 
 cztW = np.exp(1j* (-2*np.pi*fracUnitCircle)/psdPoints )
 cztA = np.exp(1j* (2*np.pi*lowCut/(tmpRf.fs/10**6) ) )
-'''
+
+
 #First loop through the directories and try to find an appropriate center frequency
 #start by manually selecting ROIs at similar depths
 #Compute the mean center frequency of all these ROIs
@@ -68,7 +78,7 @@ counter = 0
 
 for fName in os.listdir(DATA_DIR + '/liver'):
 
-    tmpRf = rfClass(LIVER_DIR + '/' + fName, 'rfd')
+    tmpRf = rfClass(TISSUE_A_DIR + '/' + fName, 'rfd')
     tmpRf.SetRoiFixedSize(WINDOWX, WINDOWY)    
     tmpRf.ReadFrame()
         
@@ -109,9 +119,9 @@ print '\nInitial region selection complete: \n Mean center frequency of: ' + str
 ##  Now pick ROIs in the liver
 ##
 counter = 0
-for fName in os.listdir(LIVER_DIR):
+for fName in os.listdir(TISSUE_A_DIR):
     while True:
-        tmpRf = rfClass( LIVER_DIR + '/' + fName, 'rfd')
+        tmpRf = rfClass( TISSUE_A_DIR + '/' + fName, 'rfd')
         tmpRf.SetRoiFixedSize(WINDOWX, WINDOWY)    
 
         tmpRf.ReadFrame()
@@ -161,9 +171,9 @@ for fName in os.listdir(LIVER_DIR):
 ##  image
 counter = 0
 
-for fName in os.listdir(PHANTOM_DIR):
+for fName in os.listdir(TISSUE_B_DIR):
     while True:
-        tmpRf = rfClass(PHANTOM_DIR + '/' + fName, 'rfd')
+        tmpRf = rfClass(TISSUE_B_DIR + '/' + fName, 'rfd')
         tmpRf.SetRoiFixedSize(WINDOWX, WINDOWY)    
 
         tmpRf.ReadFrame()
@@ -207,9 +217,8 @@ for fName in os.listdir(PHANTOM_DIR):
         answer = raw_input('Move on to next image?  Type Y or y for yes')
         if answer == 'Y' or answer == 'y':
             break        
-'''
-avgMu = 4.73
-avgSigma = .67
+
+
 ##Set up CZT parameters for GS calculation### 
 lowCut = avgMu - 1.5
 highCut = avgMu + 1.5
@@ -226,7 +235,8 @@ cztA = np.exp(1j* (2*np.pi*lowCut/(tmpRf.fs/10**6) ) )
 ####Now that I have all the ROIs, compute the system-normalized
 ####generalized spectrum of each one
 ####
-'''counter = 0
+
+counter = 0
 allFiles = os.listdir('results')
 for fName in allFiles:
 
@@ -248,20 +258,11 @@ for fName in allFiles:
 
     gsSysNorm /= tempLines
 
-    #Compute the standard deviation of the GS
-    #for l in range(tempLines):
-    #    fourierData = chirpz(dataWindow[:,l], cztA, cztW, roiPoints)
-    #    outerProd = np.outer(fourierData, fourierData.conjugate() )
-    #    gsStdDev +=  abs(gsSysNorm - outerProd/abs(outerProd) )**2 
-
-    #gsStdDev = np.sqrt(gsStdDev)/(tempLines - 1)
-    #Scale the system-normalized GS by its standard deviation
-    #gsSysNorm /= gsStdDev
-
     np.save('results' + '/' + fName[:-4] + 'GS', gsSysNorm)
     counter += 1
     print 'ROI ' + str(counter) +  ' of ' + str(len(allFiles))
-'''
+
+
 ####
 ####  Now create a liver template  
 ####
@@ -337,7 +338,5 @@ plt.xlabel('Index of ROI')
 plt.ylabel('Magnitude of template response')
 plt.legend()
 plt.savefig('results/score.png')
-
-q = 0
 
 
