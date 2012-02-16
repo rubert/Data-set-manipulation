@@ -15,4 +15,4 @@ if len(sys.argv) == 2:
 if len(sys.argv) == 3:
     rf = rfClass(sys.argv[1], sys.argv[2])
 
-rf.MakeBmodeImage()
+rf.DisplayBmodeImage()

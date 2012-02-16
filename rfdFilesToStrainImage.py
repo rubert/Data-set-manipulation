@@ -8,9 +8,11 @@ from blockMatch import blockMatchClass
 from sys import argv
 import os
 
-if len(argv) < 4:
+if len(argv) < 3:
     print "Error in usage.  Correct usage: "
-    print os.path.basename(argv[0]) + " rfdFile1 rfdFile2 itkFile"
+    print os.path.basename(argv[0]) + " rfdFile1 itkFile"
 
-bl = blockMatchClass(argv[1],'rfd', argv[2] )
-bl.CreateStrainImage(itkFileName=argv[3] )
+bl = blockMatchClass(argv[1],'rfd')
+
+for fNo in range(bl.nFrames - 1):
+    bl.CreateStrainImage(pngFileName=argv[2] + str(fNo).zfill(3) + '.png', preFrame = fNo , vMax = .02, skipFrame = 1)

@@ -5,7 +5,6 @@ already knows the ROI they want from looking at the B-mode images.'''
 
 #Frame to frame anything greater than 1.5% strain is likely an error
 STRAIN_THRESHOLD = .015
-MAX_SKIP = 3
 
 import sys, os
 #Check input argument
@@ -31,8 +30,9 @@ os.makedirs(RESULT_DIR + '/blockMatch')
 #Perform block-matching
 from blockMatch import blockMatchClass
 bl = blockMatchClass(BASE_PATH +'/'+ RFD_NAME, 'rfd', selectRoi = True)
-for frameNo in range(bl.nFrames - 1 - MAX_SKIP):
-    for skipNo in range(MAX_SKIP):
+bl.nFrames = 62
+for frameNo in range(bl.nFrames - 1 - 4):
+    for skipNo in range(5):
 
         bl.CreateStrainImage(preFrame = frameNo, skipFrame = skipNo, itkFileName = RESULT_DIR + '/blockMatch/frame_' + str(frameNo) +'_'
         + str(frameNo + 1 + skipNo) , vMax = STRAIN_THRESHOLD )
@@ -47,17 +47,17 @@ from interp2NoSplines import interp2
 DQM = zeros( bl.nFrames )
 framePairs = zeros( (bl.nFrames, 2) )
 
-for frameNo in range(MAX_SKIP, bl.nFrames - 1 -MAX_SKIP):
+for frameNo in range(5, bl.nFrames -5):
 
-    tmpDQM = zeros( (MAX_SKIP,MAX_SKIP) )
+    tmpDQM = zeros( (5,5) )
     
-    rhoRfJ = zeros( (MAX_SKIP,1) )
-    rhoRfK = zeros( (1,MAX_SKIP) )
-    rhoRf = zeros( (MAX_SKIP,MAX_SKIP) )
+    rhoRfJ = zeros( (5,1) )
+    rhoRfK = zeros( (1,5) )
+    rhoRf = zeros( (5,5) )
     
     reader = sitk.ImageFileReader()
     
-    for skip in range(MAX_SKIP):
+    for skip in range(5):
         #load up displacement between frames
         reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - skip) + '_' + str(frameNo) + 'dispY.mhd')
         dpYItk = reader.Execute()
@@ -151,11 +151,11 @@ for frameNo in range(MAX_SKIP, bl.nFrames - 1 -MAX_SKIP):
         rhoRfK[0,skip] = float(resultNp) #Compute motion compensated correlation
     
     rhoRf = (rhoRfJ + rhoRfK)/2
-    rhoS = zeros( (MAX_SKIP,MAX_SKIP) )
+    rhoS = zeros( (5,5) )
 
 
-    for j in range(MAX_SKIP):
-        for k in range(MAX_SKIP):
+    for j in range(5):
+        for k in range(5):
            ###Unfortunately going to have to go through several file formats to be able to compute normalized CC
            reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo - 1 - j) + '_' + str(frameNo) + '.mhd')
            imJ = reader.Execute()
@@ -209,6 +209,7 @@ numpy.save(RESULT_DIR + '/DQM' ,DQM)
 #composite strain, and DQM
 os.makedirs(RESULT_DIR + '/pngImages')
 
+
 import SimpleITK as sitk
 import numpy
 
@@ -220,7 +221,7 @@ from matplotlib.ticker import MaxNLocator, FormatStrFormatter
 DQM = numpy.load(RESULT_DIR + '/DQM.npy' )
 
 
-for frameNo in range(MAX_SKIP, bl.nFrames -MAX_SKIP - 1):
+for frameNo in range(5, bl.nFrames -5):
 
     bl.ReadFrame(frameNo)
     bMode = numpy.log10( abs( hilbert(bl.data, axis = 0)) )
@@ -258,8 +259,8 @@ for frameNo in range(MAX_SKIP, bl.nFrames -MAX_SKIP - 1):
     plt.set_title('DQM processing')
 
     plt = fig.add_subplot(2,2,4)
-    plt.plot( DQM[MAX_SKIP:-MAX_SKIP], lw = 3)
-    plt.plot( frameNo - MAX_SKIP, DQM[frameNo], 'ro', markersize = 10 )
+    plt.plot( DQM[5:-5], lw = 3)
+    plt.plot( frameNo - 5, DQM[frameNo], 'ro', markersize = 10 )
     locatorX = MaxNLocator(5)
     locatorY = MaxNLocator(5)
     formatter = FormatStrFormatter('%.1f')
