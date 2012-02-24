@@ -8,12 +8,12 @@ from scipy import optimize
 from chirpz import chirpz
 
 #Size of the ROI used to calculate GS
-WINDOWX = 10. #mm
-WINDOWX_PA = 25. #A-lines
-WINDOWY = 8. #mm
+WINDOWX = 25. #mm
+WINDOWX_PA = 100 #A-lines
+WINDOWY = 12. #mm
 GS_BW = 0.80 #MHz,(radius) corresponds to scatterer spacing of .385 microns
-LOW_CUT2 = .9 #MHz, there seems to be a huge peak at low frequencies between 
-
+LOW_CUT = 1.1 #MHz, there seems to be a huge peak at low frequencies between 1.1 and 1.4 MHz
+HIGH_CUT = 1.4
 
 if len(sys.argv) < 2:
     print '\nError, usage is: \n generalizedSpectrumAvgValue.py DATA_DIR <PHASED ARRAY?>'
@@ -39,6 +39,7 @@ from rfData import rfClass
 ##its size in pixels
 print '\n ROI selection to determine ROI size in pixels'
 tmpRf = rfClass(DATA_DIR + '/' + os.listdir(DATA_DIR)[0], 'rfd')
+
 tmpRf.SetRoiFixedSize(WINDOWX, WINDOWY)    
 region = tmpRf.data[tmpRf.roiY[0]:tmpRf.roiY[1], tmpRf.roiX[0]:tmpRf.roiX[1]]
 roiPoints, roiLines = region.shape
@@ -60,8 +61,7 @@ cztA = np.exp(1j* (2*np.pi*lowCut/(tmpRf.fs/10**6) ) )
 #First loop through the directories and try to find an appropriate center frequency
 #start by manually selecting ROIs at similar depths
 #Compute the mean center frequency of all these ROIs
-caList = []
-caMax = []
+caStatistic = []
 counter = 0
 allFiles = os.listdir(DATA_DIR )
 allFiles = [f for f in allFiles if 'rfd' in f]
@@ -74,6 +74,11 @@ for fName in allFiles:
     else:
         tmpRf.SetRoiFixedSize(WINDOWX_PA, WINDOWY)
 
+
+    ###Save the ROI coordinates to a numpy array so I don't have to 
+    ###keep clicking the same pictures over and over
+    np.save(DATA_DIR + '/roi' + str(counter), np.array( [tmpRf.roiY[0], tmpRf.roiY[1], tmpRf.roiX[0], tmpRf.roiX[1]] ) )
+    
     tmpRf.SaveRoiImage(DATA_DIR + '/roi' + str(counter) + '.png' )
     tmpRf.ReadFrame()
         
@@ -135,25 +140,27 @@ for fName in allFiles:
     CA = np.zeros( len(spectrumFreqs) )
     countCA = np.zeros( len(spectrumFreqs) )
 
-    for delta in range( len(spectrumFreqs) ):
-        for f1 in range( len(spectrumFreqs) ):
-            for f2 in range( len(spectrumFreqs) ):
+    for f1 in range( len(spectrumFreqs) ):
+        for f2 in range( len(spectrumFreqs) ):
                 
-                if abs(f2 - f1) == delta:
-                    CA[delta] += abs(gsSysNorm[f1,f2])
-                    countCA[delta] += 1
+            delta = abs(f2 - f1)
+            CA[delta] += abs(gsSysNorm[f1,f2])
+            countCA[delta] += 1
 
     CA /= countCA
-
-
+    
     ##Work out cut-off frequencies for collapsed Average
     ##(3/4 window size) and .385 microns
-    fLow = 1540./(2*.75*WINDOWY*10**-3)*10**-6
-    startInd = round(fLow / freqStep)
-    startInd2 = round(LOW_CUT2 / freqStep)
-    caList += [ CA[startInd:].mean() ]
-    caList += [ CA[startInd2:].mean() ]
-    caMax += [ CA[startInd2:].max() ]
+    fLowPowerSpectrumRollOff = 1540./(2*.75*WINDOWY*10**-3)*10**-6
+    startIndPowerSpectrumRollOff = int( round(fLowPowerSpectrumRollOff / freqStep) )
+    maxStartInd = int( round(LOW_CUT/freqStep) )
+    stopInd = int( round(HIGH_CUT/freqStep)  )
+
+    meanValueCalculationIndexes = np.array( range(startIndPowerSpectrumRollOff,maxStartInd) + range(stopInd, tempPoints)
+    )
+
+    ###Add statistic to list
+    caStatistic += [ CA[maxStartInd:stopInd].max()/CA[meanValueCalculationIndexes].mean() ]
 
     ##Plot collapsed average save plot
     plt.plot( np.arange(0, freqStep*len(spectrumFreqs), freqStep) , CA)
@@ -166,19 +173,13 @@ for fName in allFiles:
     print 'ROI ' + str(counter) +  ' of ' + str(len(allFiles))
 
 
-avgCA = np.array( caList[0::2]) 
-avgCA2 = np.array( caList[1::2] )
-
-f = open( DATA_DIR + 'results.txt' , 'w')
-f.write('Average CA of: ' + str(avgCA.mean()) +'\n' )
-f.write( 'Standard dev. of: ' + str(avgCA.std())  )
-f.write('\n\n')
-
-f.write( 'In limited range, Average CA of: ' + str(avgCA2.mean())  +'\n' )
-f.write( 'In limited range, Standard dev. of: ' + str(avgCA2.std())   )
-f.write('\n\n')
-
-f.write( 'Between ' + str(LOW_CUT2) + ' and 1.5 MHz the mean maximum value of the CA is: ' + str( np.array(caMax).mean() )  +'\n')
-f.write( 'Between ' + str(LOW_CUT2) + ' and 1.5 MHz the std dev maximum value of the CA is: ' + str( np.array(caMax).std() )  )
-f.write('\n\n')
+#Write statistic to text file
+caStatistic = np.array( caStatistic )
+f = open( DATA_DIR + '/results.txt' , 'w')
+f.write( 'The MAX/MEAN statistic mean value is: ' + str(caStatistic.mean() )  +'\n')
+f.write( 'The MAX/MEAN standard deviation is: ' + str(caStatistic.std() ) + '\n' )
+f.write( 'The number of ROIs showing a peak in the range of interest is: ' + str(len(caStatistic[caStatistic > 2] ) ) +
+'\n')
+f.write( 'The number of ROIs showing a peak in the range of interest as a percentage is: ' +
+str(len(caStatistic[caStatistic > 2] ) /float(len(caStatistic) )) )
 f.close()
