@@ -27,12 +27,10 @@ if '.png' not in argv[3]:
 else:
     picFName = argv[3]
 
-bl = blockMatchClass(argv[1],'rfd',postFile = argv[2], selectRoi = True)
+bl = blockMatchClass(argv[1],'rfd',postFile = argv[2])#, selectRoi = True)
 bl.CreateStrainImage(pngFileName=picFName, vMax = vMax)
 
-plt.imshow(bl.strainRGB, extent = [0, bl.fovX, bl.fovY, 0] , vmax = vMax, cmap = 'gray')
-plt.colorbar()
-plt.show()
+bl.DisplayScanConvertedStrainImage(vMax)
 
 answer = None
 while answer is not 'Y' and answer is not 'N':
@@ -47,9 +45,7 @@ while not satisfiedWithScale:
     newMax = float( raw_input('Enter a new maximum strain value to display\n') )
     print '\n The new maximum is: ' + str(newMax)
     bl.RescaleRgbStrainImage(newMax)
-    plt.imshow(bl.strainRGB, extent = [0, bl.fovX, bl.fovY, 0] , vmax = newMax, cmap = 'gray')
-    plt.colorbar()
-    plt.show()
+    bl.DisplayScanConvertedStrainImage(newMax)
    
     answer = None
     while answer is not 'Y' and answer is not 'N':

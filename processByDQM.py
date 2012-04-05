@@ -17,7 +17,8 @@ if not os.path.isfile(sys.argv[1]):
     print "\nError, usage is: \n processByDQM.py RFD_NAME "
     print "RFD_NAME passed is not a regular file.(Potential RFD file) \n"
     sys.exit()
-#Establish paths'''
+#Establish paths
+
 BASE_PATH, RFD_NAME = os.path.split(os.path.abspath(sys.argv[1]))
 print "\nProcessing file named: " + RFD_NAME + "\non path: " + BASE_PATH + "\n"
 RESULT_DIR = BASE_PATH +'/' + RFD_NAME[:-4] + 'Results'
@@ -229,6 +230,7 @@ for frameNo in range(MAX_SKIP, bl.nFrames -MAX_SKIP - 1):
     reader.SetFileName(RESULT_DIR + '/blockMatch/frame_' + str(frameNo) + 'strainComposite.mhd')
     strainCompItk = reader.Execute()
     strainComp = sitk.GetArrayFromImage(strainCompItk)
+    print strainCompItk.GetOrigin()
     strainCompRGB = bl.CreateParametricImage(strainComp, strainCompItk.GetOrigin(), strainCompItk.GetSpacing(), inPixels = False, frameNo
     = frameNo, colormap = 'gray', vmin = 0, vmax = .01 )
     
